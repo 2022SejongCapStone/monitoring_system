@@ -130,3 +130,4 @@ dmypy.json
 
 # hide settings
 settings.json
+stock/*
