@@ -6,5 +6,7 @@ from src import jsonmodule as jm
 if __name__ == "__main__":
     crawler = Crawler()
     crawler.open()
-    input("if you want to finish enter anything")
+    print("if you want to finish enter Ctrl+C...")
+    while True:
+        commend = input()
     crawler.close()
