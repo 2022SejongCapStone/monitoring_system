@@ -12,6 +12,8 @@ import logging
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src import jsonmodule as jm
+from src import database as db
+from src import directory as dt
 
 
 logging.basicConfig(filename='../info.log', filemode='w', level=logging.INFO, format='%(asctime)s - %(levelname)s [%(filename)s]: %(name)s %(funcName)20s - Message: %(message)s')
@@ -111,28 +113,44 @@ class Crawler():
 
 
     def findFileFlow(self, url):
+        dir_path = ""
+        if url.startswith("http://"):
+            dir_path = url[7:]
+        elif url.startswith("https://"):
+            dir_path = url[8:]
         driver = self.makeFileDriver(url)
         driver.get(url)
         if self.loginFlow(driver, url):
             while True:
+                dbcontrol = db.URLDataBase(url)
                 try:
                     for i in range(0, 5):
                         driver.find_element(By.XPATH, '/html/body/div/ul[1]/li['+ str(i+1) +']/div[2]/div[1]/a').click()
                         logging.info("Into Posts URL " + driver.current_url)
                         driver.implicitly_wait(3)
+                        if dbcontrol.isDataExist(driver.current_url):
+                            continue
                         driver.find_element(By.XPATH, '/html/body/div/div/div[1]/div[2]/div/div[1]/form/input[2]').click()
-                        logging.info("Downloads file!")
+                        logging.info("Downloads file! " + driver.current_url)
+                        dbcontrol.insert(driver.current_url)
                         #send to client system
                         driver.back()
                         driver.implicitly_wait(3)
+                        logging.info("DELETE directory! ")
+                        dt.deleteDir('../stock/'+dir_path+'content/')
+                        logging.info("CREATE directory! ")
+                        dt.makeDir('../stock/'+dir_path+'content/')
                     driver.find_element(By.XPATH, '/html/body/div/ul[2]/li[4]/a').click()
                     logging.info("Next Page URL " + driver.current_url)
+                    dbcontrol.dump()
                 except NoSuchElementException:
                     logging.info("End of posts")
-                    sleep(600)
+                    dbcontrol.close()
+                    sleep(60)
                     driver.find_element(By.XPATH, '/html/body/nav/div/a').click()
                 except Exception as e:
-                    logging.info("Error in movePageforUrl " + e)
+                    logging.info("Error in movePageforUrl " + str(e))
+                    dbcontrol.close()
                     return
         else:
             logging.info("Thread killed")
@@ -195,10 +213,9 @@ class Crawler():
             url = url[7:]
         elif url.startswith("https://"):
             url = url[8:]
-        if not os.path.exists('../stock/'+url):
-            os.makedirs('../stock/'+url)
+        dt.makeDir('../stock/'+url+'content/')
         options.add_experimental_option("prefs", {
-                                "download.default_directory": "../stock/"+url,
+                                "download.default_directory": "../stock/"+url+"content/",
                                 "download.prompt_for_download": False,
                                 "download.directory_upgrade": True,
                                 "safebrowsing.enabled": True
