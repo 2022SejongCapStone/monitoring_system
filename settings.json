@@ -1,9 +1,11 @@
 {
-    "STARTURL": "",
+    "STARTURL": "http://20.214.226.173:5000/",
     "KNOWNURL": [],
     "USERINFO": {
-        "EMAIL": "",
-        "ID": "",
-        "PW": ""
-    }
+        "EMAIL": "cumulus123@naver.com",
+        "ID": "cumulusfortest123",
+        "PW": "andrprnfmaxptmxm123"
+    },
+    "HOST": "0.0.0.0",
+    "PORT": 8080
 }
