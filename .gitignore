@@ -129,5 +129,4 @@ dmypy.json
 .pyre/
 
 # hide settings
-settings.json
 stock/*
