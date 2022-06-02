@@ -8,6 +8,7 @@ from threading import Thread
 from time import sleep
 import re
 import logging
+import socket
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
@@ -26,6 +27,8 @@ class Crawler():
 
     def __init__(self):
         userinfo = jm.get_secret("USERINFO")
+        self.host_ = jm.get_secret("HOST")
+        self.port_ = jm.get_secret("PORT")
         self.id_ = userinfo["ID"]
         self.pw_ = userinfo["PW"]
         self.email_ = userinfo["EMAIL"]
@@ -34,9 +37,15 @@ class Crawler():
         self.url_thread_ = None
         self.driver_ = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
         self.content_re_ = re.compile('http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+')
+        self.serversocket_ = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.serversocket_.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.clientlist_ = []
 
 
     def open(self, url=jm.get_secret("STARTURL")):
+        self.server_thread = Thread(target=self.serverSocketFlow, args=[])
+        self.server_thread.setDaemon(True)
+        self.server_thread.start()
         self.url_list_.append(url)
         self.url_thread_ = Thread(target=self.findUrlFlow, args=[])
         self.url_thread_.setDaemon(True)
@@ -48,7 +57,18 @@ class Crawler():
         # for thd in self.file_thread_list_:
         #     thd.exit()
         # self.url_thread_.exit()
+        # self.serversocket_.close()
+        # for client in self.clientlist_:
+        #     client.close()
         return True
+
+
+    def serverSocketFlow(self):
+        self.serversocket_.bind((self.host_, self.port_))
+        self.serversocket_.listen()
+        while True:
+            clientsocket, addr = self.serversocket_.accept()
+            self.clientlist_.append(clientsocket)
 
 
     def findUrlFlow(self):
@@ -133,7 +153,9 @@ class Crawler():
                         driver.find_element(By.XPATH, '/html/body/div/div/div[1]/div[2]/div/div[1]/form/input[2]').click()
                         logging.info("Downloads file! " + driver.current_url)
                         dbcontrol.insert(driver.current_url)
-                        #send to client system
+                        # Server to Client
+                        self.makeServerThread(b"Something Found!")
+                        # Server to Client
                         driver.back()
                         driver.implicitly_wait(3)
                         logging.info("DELETE directory! ")
@@ -224,6 +246,26 @@ class Crawler():
         logging.info("File Driver create")
         return driver
 
+
+    def makeServerThread(self, data):
+        logging.info("Server thread create")
+        for client in self.clientlist_:
+            thd = Thread(target=self.interactFlow, args=[client, data])
+            thd.setDaemon(True)
+            thd.start()
+        logging.info("Server thread start")
+    
+
+    def interactFlow(self, client, data):
+        logging.info(data)
+        client.sendall(bytes(data))
+        res = client.recv(1500)
+        if True:
+            client.sendall(b"0.77777")
+            return "Email sending"
+        else:
+            return "Not Real File"
+            
 
 if __name__ == "__main__":
     userinfo = jm.get_secret("USERINFO")
