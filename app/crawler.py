@@ -231,6 +231,7 @@ class Crawler():
 
 
     def makeFileDriver(self, url):
+        dt.deleteDir('../stock')
         if url.startswith("http://"):
             url = url[7:]
         elif url.startswith("https://"):
