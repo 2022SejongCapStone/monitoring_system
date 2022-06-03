@@ -9,12 +9,16 @@ from time import sleep
 import re
 import logging
 import socket
+import pickle
 
 import sys, os
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from src import jsonmodule as jm
 from src import database as db
 from src import directory as dt
+from src import AdditiveElgamal as ae
+from src import compare as cp
+from scripts import analysis as al
 
 
 logging.basicConfig(filename='../info.log', filemode='w', level=logging.INFO, format='%(asctime)s - %(levelname)s [%(filename)s]: %(name)s %(funcName)20s - Message: %(message)s')
@@ -40,12 +44,16 @@ class Crawler():
         self.serversocket_ = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.serversocket_.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.clientlist_ = []
+        self.clientlistforjoin_ = []
 
 
     def open(self, url=jm.get_secret("STARTURL")):
+        key = jm.get_secret("KEY")
+        self.privkey_ = ae.construct_additive((key['P'], key['G'], key['Y'], key['X']))
         self.server_thread = Thread(target=self.serverSocketFlow, args=[])
         self.server_thread.setDaemon(True)
         self.server_thread.start()
+        sleep(10)
         self.url_list_.append(url)
         self.url_thread_ = Thread(target=self.findUrlFlow, args=[])
         self.url_thread_.setDaemon(True)
@@ -64,10 +72,17 @@ class Crawler():
 
 
     def serverSocketFlow(self):
+        key = jm.get_secret("KEY")
         self.serversocket_.bind((self.host_, self.port_))
         self.serversocket_.listen()
         while True:
             clientsocket, addr = self.serversocket_.accept()
+            publickey = {}
+            publickey["P"] = key["P"]
+            publickey["G"] = key["G"]
+            publickey["Y"] = key["Y"]
+            clientsocket.sendall(pickle.dumps(publickey))
+            # key exchange
             self.clientlist_.append(clientsocket)
 
 
@@ -154,7 +169,10 @@ class Crawler():
                         logging.info("Downloads file! " + driver.current_url)
                         dbcontrol.insert(driver.current_url)
                         # Server to Client
-                        self.makeServerThread(b"Something Found!")
+                        extractedFragments = al.analysis("../stock/"+dir_path+'content/')
+                        self.makeServerThread(extractedFragments)
+                        for clntthd in self.clientlistforjoin_:
+                            clntthd.join()
                         # Server to Client
                         driver.back()
                         driver.implicitly_wait(3)
@@ -254,38 +272,76 @@ class Crawler():
             thd = Thread(target=self.interactFlow, args=[client, data])
             thd.setDaemon(True)
             thd.start()
+            self.clientlistforjoin_.append(thd)
         logging.info("Server thread start")
     
 
-    def interactFlow(self, client, data):
-        logging.info(data)
-        client.sendall(bytes(data))
-        res = client.recv(1500)
-        if True:
-            client.sendall(b"0.77777")
-            return "Email sending"
-        else:
-            return "Not Real File"
+    def interactFlow(self, client, extractedfragments):
+        logging.info(extractedfragments)
+        count = 0
+        for k, v in extractedfragments.items():
+            for i in v:
+                count += 1
+        client.sendall(str(count).encode())
+        cfid_list = []
+        for k, v in extractedfragments.items():
+            for i in v:
+                packet = {}
+                cfid_list.append(i.id)
+                packet[k] = cp.encrypt_simhash(self.privkey_, i.simhash)
+                client.sendall(pickle.dumps(packet))
+                client.sendall("End".encode())
+        data = []
+        while True:
+            packet = client.recv(4096)
+            if b"End" in packet:
+                data.append(packet[:packet.find(b"End")])
+                break
+            data.append(packet)
+        enc_HD_dict_list = pickle.loads(b"".join(data))
+
+        for cfid, enc_HD_dict in zip(cfid_list, enc_HD_dict_list):
+            for clnt_cfid, enc_HD in enc_HD_dict.items():
+                sim = self.privkey_._decrypt(enc_HD)
+                print(sim)
+                if sim <= 40:
+                    client.sendall(b"Y")
+                    reportdict = {}
+                    for k, v in extractedfragments.items():
+                        for i in v:
+                            if i.id == cfid:
+                                reportdict["serv_file"] = i.startline
+                                reportdict["serv_startline"] = i.file
+                                reportdict["serv_endline"] = i.endline
+                                reportdict["serv_content"] = i.content
+                                reportdict["clnt_cfid"] = clnt_cfid
+                    client.sendall(pickle.dumps(reportdict))
+                    client.sendall(b"End")
+                    return "Email sending"
+                else:
+                    client.sendall(b"N")
+                    return "Not Real File"
             
 
 if __name__ == "__main__":
-    userinfo = jm.get_secret("USERINFO")
-    uid = userinfo["ID"]
-    upw = userinfo["PW"]
-    email = userinfo["EMAIL"]
-    url = "http://127.0.0.1:5000/"
-    options = webdriver.ChromeOptions()
-    options.add_argument('window-size=1100,900')
-    options.add_argument('--headless')
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.get(url)
-    driver.find_element(By.XPATH, '//*[@id="navbarNav"]/ul/li/a').click()
-    driver.implicitly_wait(3)
-    driver.find_element(By.XPATH, '//*[@id="email"]').send_keys(email)
-    driver.find_element(By.XPATH, '//*[@id="password"]').send_keys(upw)
-    driver.find_element(By.XPATH, '//*[@id="submit"]').click()
-    driver.implicitly_wait(3)
-    if driver.current_url == url:
-        print("login success")
-    else:
-        print("login failed")
+    al.analysis("../system")
+    # userinfo = jm.get_secret("USERINFO")
+    # uid = userinfo["ID"]
+    # upw = userinfo["PW"]
+    # email = userinfo["EMAIL"]
+    # url = "http://127.0.0.1:5000/"
+    # options = webdriver.ChromeOptions()
+    # options.add_argument('window-size=1100,900')
+    # options.add_argument('--headless')
+    # driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    # driver.get(url)
+    # driver.find_element(By.XPATH, '//*[@id="navbarNav"]/ul/li/a').click()
+    # driver.implicitly_wait(3)
+    # driver.find_element(By.XPATH, '//*[@id="email"]').send_keys(email)
+    # driver.find_element(By.XPATH, '//*[@id="password"]').send_keys(upw)
+    # driver.find_element(By.XPATH, '//*[@id="submit"]').click()
+    # driver.implicitly_wait(3)
+    # if driver.current_url == url:
+    #     print("login success")
+    # else:
+    #     print("login failed")
