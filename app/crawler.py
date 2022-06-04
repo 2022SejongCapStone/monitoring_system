@@ -53,7 +53,7 @@ class Crawler():
         self.server_thread = Thread(target=self.serverSocketFlow, args=[])
         self.server_thread.setDaemon(True)
         self.server_thread.start()
-        sleep(10)
+        sleep(5)
         self.url_list_.append(url)
         self.url_thread_ = Thread(target=self.findUrlFlow, args=[])
         self.url_thread_.setDaemon(True)
@@ -165,11 +165,17 @@ class Crawler():
                         driver.implicitly_wait(3)
                         if dbcontrol.isDataExist(driver.current_url):
                             continue
+                        if not driver.find_element(By.XPATH, '/html/body/div/div/div/div[2]/div/div[1]/div[2]').text.endswith('.c'):
+                            driver.back()
+                            driver.implicitly_wait(3)
+                            logging.info("Not .c file")
+                            continue
                         driver.find_element(By.XPATH, '/html/body/div/div/div[1]/div[2]/div/div[1]/form/input[2]').click()
+                        sleep(5)
                         logging.info("Downloads file! " + driver.current_url)
                         dbcontrol.insert(driver.current_url)
                         # Server to Client
-                        extractedFragments = al.analysis("../stock/"+dir_path+'content/')
+                        extractedFragments = al.analysis("stock/"+dir_path+'content/')
                         self.makeServerThread(extractedFragments)
                         for clntthd in self.clientlistforjoin_:
                             clntthd.join()
@@ -177,9 +183,11 @@ class Crawler():
                         driver.back()
                         driver.implicitly_wait(3)
                         logging.info("DELETE directory! ")
-                        dt.deleteDir('../stock/'+dir_path+'content/')
+                        dt.deleteDir('stock/'+dir_path+'content/')
+                        dt.deleteDir("../system/")
                         logging.info("CREATE directory! ")
-                        dt.makeDir('../stock/'+dir_path+'content/')
+                        dt.makeDir('stock/'+dir_path+'content/')
+                        dt.makeDir("../system/")
                     driver.find_element(By.XPATH, '/html/body/div/ul[2]/li[4]/a').click()
                     logging.info("Next Page URL " + driver.current_url)
                     dbcontrol.dump()
@@ -249,14 +257,16 @@ class Crawler():
 
 
     def makeFileDriver(self, url):
-        dt.deleteDir('../stock')
+        dt.deleteDir("stock/")
+        dt.deleteDir("../system/")
         if url.startswith("http://"):
             url = url[7:]
         elif url.startswith("https://"):
             url = url[8:]
-        dt.makeDir('../stock/'+url+'content/')
+        dt.makeDir("stock/"+url+'content/')
+        dt.makeDir("../system/")
         options.add_experimental_option("prefs", {
-                                "download.default_directory": "../stock/"+url+"content/",
+                                "download.default_directory": "stock/"+url+"content/",
                                 "download.prompt_for_download": False,
                                 "download.directory_upgrade": True,
                                 "safebrowsing.enabled": True
@@ -282,7 +292,8 @@ class Crawler():
         for k, v in extractedfragments.items():
             for i in v:
                 count += 1
-        client.sendall(str(count).encode())
+        client.sendall(str(count).encode().ljust(10, b'A'))
+        sleep(1)
         cfid_list = []
         for k, v in extractedfragments.items():
             for i in v:
@@ -290,12 +301,14 @@ class Crawler():
                 cfid_list.append(i.id)
                 packet[k] = cp.encrypt_simhash(self.privkey_, i.simhash)
                 client.sendall(pickle.dumps(packet))
-                client.sendall("End".encode())
+                sleep(1)
+                client.sendall("EndofPacket".encode())
+                sleep(1)
         data = []
         while True:
-            packet = client.recv(4096)
-            if b"End" in packet:
-                data.append(packet[:packet.find(b"End")])
+            packet = client.recv(1500)
+            if b"EndofPacket" == packet:
+                # data.append(packet[:packet.find(b"EndofPacket")])
                 break
             data.append(packet)
         enc_HD_dict_list = pickle.loads(b"".join(data))
@@ -303,9 +316,10 @@ class Crawler():
         for cfid, enc_HD_dict in zip(cfid_list, enc_HD_dict_list):
             for clnt_cfid, enc_HD in enc_HD_dict.items():
                 sim = self.privkey_._decrypt(enc_HD)
-                print(sim)
+                logging.info("Sim Value: "+str(sim))
                 if sim <= 40:
-                    client.sendall(b"Y")
+                    client.sendall(b"YYYYYYYYYY")
+                    sleep(1)
                     reportdict = {}
                     for k, v in extractedfragments.items():
                         for i in v:
@@ -316,32 +330,39 @@ class Crawler():
                                 reportdict["serv_content"] = i.content
                                 reportdict["clnt_cfid"] = clnt_cfid
                     client.sendall(pickle.dumps(reportdict))
-                    client.sendall(b"End")
+                    sleep(1)
+                    client.sendall(b"EndofPacket")
+                    sleep(1)
                     return "Email sending"
                 else:
-                    client.sendall(b"N")
+                    client.sendall(b"NNNNNNNNNN")
+                    sleep(1)
                     return "Not Real File"
             
 
 if __name__ == "__main__":
-    al.analysis("../system")
-    # userinfo = jm.get_secret("USERINFO")
-    # uid = userinfo["ID"]
-    # upw = userinfo["PW"]
-    # email = userinfo["EMAIL"]
-    # url = "http://127.0.0.1:5000/"
-    # options = webdriver.ChromeOptions()
-    # options.add_argument('window-size=1100,900')
-    # options.add_argument('--headless')
-    # driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    # driver.get(url)
-    # driver.find_element(By.XPATH, '//*[@id="navbarNav"]/ul/li/a').click()
-    # driver.implicitly_wait(3)
-    # driver.find_element(By.XPATH, '//*[@id="email"]').send_keys(email)
-    # driver.find_element(By.XPATH, '//*[@id="password"]').send_keys(upw)
-    # driver.find_element(By.XPATH, '//*[@id="submit"]').click()
-    # driver.implicitly_wait(3)
-    # if driver.current_url == url:
-    #     print("login success")
-    # else:
-    #     print("login failed")
+    userinfo = jm.get_secret("USERINFO")
+    uid = userinfo["ID"]
+    upw = userinfo["PW"]
+    email = userinfo["EMAIL"]
+    url = "http://20.214.226.173:5000/post_reply/2"
+    options = webdriver.ChromeOptions()
+    options.add_argument('window-size=1100,900')
+    options.add_argument('--headless')
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    driver.get(url)
+    if not driver.find_element(By.XPATH, '/html/body/div/div/div/div[2]/div/div[1]/div[2]').text.endswith('.c'):
+        driver.back()
+        driver.implicitly_wait(3)
+        print("Not .c file")
+
+    driver.find_element(By.XPATH, '//*[@id="navbarNav"]/ul/li/a').click()
+    driver.implicitly_wait(3)
+    driver.find_element(By.XPATH, '//*[@id="email"]').send_keys(email)
+    driver.find_element(By.XPATH, '//*[@id="password"]').send_keys(upw)
+    driver.find_element(By.XPATH, '//*[@id="submit"]').click()
+    driver.implicitly_wait(3)
+    if driver.current_url == url:
+        print("login success")
+    else:
+        print("login failed")
