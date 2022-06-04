@@ -11,8 +11,8 @@ class URLDataBase():
         elif url.startswith("https://"):
             url = url[8:]
         self.url_ = url
-        self.db_path_ = '../stock/'+ self.url_ +'db'
-        self.sql_path_ = '../stock/'+ self.url_ +'db/dump.sql'
+        self.db_path_ = 'stock/'+ self.url_ +'db'
+        self.sql_path_ = 'stock/'+ self.url_ +'db/dump.sql'
         dt.makeDir(self.db_path_)
         self.conn_ = sqlite3.connect(self.db_path_+'/cumulusdb.db')
         self.c_ = self.conn_.cursor()
