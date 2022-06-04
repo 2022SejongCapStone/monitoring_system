@@ -159,7 +159,7 @@ class Crawler():
             while True:
                 dbcontrol = db.URLDataBase(url)
                 try:
-                    for i in range(0, 5):
+                    for i in range(0, 10):
                         driver.find_element(By.XPATH, '/html/body/div/ul[1]/li['+ str(i+1) +']/div[2]/div[1]/a').click()
                         logging.info("Into Posts URL " + driver.current_url)
                         driver.implicitly_wait(3)
@@ -287,57 +287,63 @@ class Crawler():
     
 
     def interactFlow(self, client, extractedfragments):
-        logging.info(extractedfragments)
-        count = 0
-        for k, v in extractedfragments.items():
-            for i in v:
-                count += 1
-        client.sendall(str(count).encode().ljust(10, b'A'))
-        sleep(1)
-        cfid_list = []
-        for k, v in extractedfragments.items():
-            for i in v:
-                packet = {}
-                cfid_list.append(i.id)
-                packet[k] = cp.encrypt_simhash(self.privkey_, i.simhash)
-                client.sendall(pickle.dumps(packet))
-                sleep(1)
-                client.sendall("EndofPacket".encode())
-                sleep(1)
-        data = []
-        while True:
-            packet = client.recv(1500)
-            if b"EndofPacket" == packet:
-                # data.append(packet[:packet.find(b"EndofPacket")])
-                break
-            data.append(packet)
-        enc_HD_dict_list = pickle.loads(b"".join(data))
+        try:
+            logging.info(extractedfragments)
+            count = 0
+            for k, v in extractedfragments.items():
+                for i in v:
+                    count += 1
+            client.sendall(str(count).encode().ljust(10, b'A'))
+            sleep(1)
+            cfid_list = []
+            for k, v in extractedfragments.items():
+                for i in v:
+                    packet = {}
+                    cfid_list.append(i.id)
+                    packet[k] = cp.encrypt_simhash(self.privkey_, i.simhash)
+                    client.sendall(pickle.dumps(packet))
+                    sleep(1)
+                    client.sendall("EndofPacket".encode())
+                    sleep(1)
+            data = []
+            while True:
+                packet = client.recv(1500)
+                if b"EndofPacket" == packet:
+                    # data.append(packet[:packet.find(b"EndofPacket")])
+                    break
+                data.append(packet)
+            enc_HD_dict_list = pickle.loads(b"".join(data))
 
-        for cfid, enc_HD_dict in zip(cfid_list, enc_HD_dict_list):
-            for clnt_cfid, enc_HD in enc_HD_dict.items():
-                sim = self.privkey_._decrypt(enc_HD)
-                logging.info("Sim Value: "+str(sim))
-                if sim <= 40:
-                    client.sendall(b"YYYYYYYYYY")
-                    sleep(1)
-                    reportdict = {}
-                    for k, v in extractedfragments.items():
-                        for i in v:
-                            if i.id == cfid:
-                                reportdict["serv_file"] = i.startline
-                                reportdict["serv_startline"] = i.file
-                                reportdict["serv_endline"] = i.endline
-                                reportdict["serv_content"] = i.content
-                                reportdict["clnt_cfid"] = clnt_cfid
-                    client.sendall(pickle.dumps(reportdict))
-                    sleep(1)
-                    client.sendall(b"EndofPacket")
-                    sleep(1)
-                    return "Email sending"
-                else:
-                    client.sendall(b"NNNNNNNNNN")
-                    sleep(1)
-                    return "Not Real File"
+            for cfid, enc_HD_dict in zip(cfid_list, enc_HD_dict_list):
+                for clnt_cfid, enc_HD in enc_HD_dict.items():
+                    sim = self.privkey_._decrypt(enc_HD)
+                    logging.info("Sim Value: "+str(sim))
+                    if sim <= 23:
+                        client.sendall(b"YYYYYYYYYY")
+                        sleep(1)
+                        reportdict = {}
+                        for k, v in extractedfragments.items():
+                            for i in v:
+                                if i.id == cfid:
+                                    reportdict["serv_file"] = i.startline
+                                    reportdict["serv_startline"] = i.file
+                                    reportdict["serv_endline"] = i.endline
+                                    reportdict["serv_content"] = i.content
+                                    reportdict["clnt_cfid"] = clnt_cfid
+                        client.sendall(pickle.dumps(reportdict))
+                        sleep(1)
+                        client.sendall(b"EndofPacket")
+                        sleep(1)
+                        return "Email sending"
+                    else:
+                        client.sendall(b"NNNNNNNNNN")
+                        sleep(1)
+                        return "Not Real File"
+        except Exception as e:
+            print("Error", e)
+            self.clientlist_.remove(client)
+            client.close()
+            return "End of socket"
             
 
 if __name__ == "__main__":
