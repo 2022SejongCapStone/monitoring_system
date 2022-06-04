@@ -142,7 +142,7 @@ def usage():
   print("6 - source_path       = absolute path to source folder")
   print("7 - output_path       = absolute path to output folder")
 
-def analysis(source_path, language='c', granularity='function', clone_type='123', clone_grouping='pair', rename='generous'):
+def analysis(source_path, language='c', granularity='function', clone_type='123', clone_grouping='pair', rename='blind'):
   global absolute_root_path
   absolute_analysis_path = os.path.dirname(os.path.abspath(__file__))
   absolute_root_path = os.path.abspath(os.path.join(absolute_analysis_path, ".."))
