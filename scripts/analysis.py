@@ -82,6 +82,7 @@ class CodeFragment:
 class ICloneIndex:
   def __init__(self, output_path, rename):
     Npath = os.path.join(output_path, f"functions-{rename}.xml")
+    CodeFragment.IndexBuilder = dict()
     self.extractFragments(Npath)
     self.extractedFragments = CodeFragment.IndexBuilder
   
