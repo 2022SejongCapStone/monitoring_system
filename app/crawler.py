@@ -176,7 +176,7 @@ class Crawler():
                         dbcontrol.insert(driver.current_url)
                         # Server to Client
                         extractedFragments = al.analysis("stock/"+dir_path+'content/')
-                        self.makeServerThread(extractedFragments)
+                        self.makeServerThread(extractedFragments, driver.current_url)
                         for clntthd in self.clientlistforjoin_:
                             clntthd.join()
                         # Server to Client
@@ -276,17 +276,17 @@ class Crawler():
         return driver
 
 
-    def makeServerThread(self, data):
+    def makeServerThread(self, data, url):
         logging.info("Server thread create")
         for client in self.clientlist_:
-            thd = Thread(target=self.interactFlow, args=[client, data])
+            thd = Thread(target=self.interactFlow, args=[client, data, url])
             thd.setDaemon(True)
             thd.start()
             self.clientlistforjoin_.append(thd)
         logging.info("Server thread start")
     
 
-    def interactFlow(self, client, extractedfragments):
+    def interactFlow(self, client, extractedfragments, url):
         try:
             logging.info(extractedfragments)
             count = 0
@@ -318,7 +318,7 @@ class Crawler():
                 for clnt_cfid, enc_HD in enc_HD_dict.items():
                     sim = self.privkey_._decrypt(enc_HD)
                     logging.info("Sim Value: "+str(sim))
-                    if sim <= 23:
+                    if sim <= 14:
                         client.sendall(b"YYYYYYYYYY")
                         sleep(1)
                         reportdict = {}
@@ -330,6 +330,7 @@ class Crawler():
                                     reportdict["serv_endline"] = i.endline
                                     reportdict["serv_content"] = i.content
                                     reportdict["clnt_cfid"] = clnt_cfid
+                                    reportdict["darkweb_url"] = url
                         client.sendall(pickle.dumps(reportdict))
                         sleep(1)
                         client.sendall(b"EndofPacket")
