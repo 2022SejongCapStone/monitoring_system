@@ -1,0 +1,140 @@
+#!/bin/bash
+
+# 
+
+usage() {
+  echo "Usage: Extract&Rename language granularity rename source-dir output-dir"
+  echo ""
+  echo "Example : ExtracAndRename "
+  echo "          where language      is one of:  { c }"
+  echo "          and   granularity   is one of:  { function block }"
+  echo "          and   rename        is one of:  { blind consistent }"
+  echo ""
+}
+
+debug_mode="true"
+
+lib="${0%%/scripts/ExtractAndRename}"
+
+echo "lib : ${lib}"
+
+if [ ! -d ${lib}/tools ]
+then
+  echo "[ExtractAndRename] *** Error:  cannot find simCad installation ${lib}"
+  echo ""
+  exit 1
+fi
+
+# check we compiled the tools
+if [ ! -x ${lib}/tools/streamprocess.x ]
+then
+  echo "[ExtractAndRename] *** Error:  Missing ${lib}/tools/streamprocess.x - type 'make' to make the ${lib}/tools/"
+  echo ""
+  exit 2
+fi
+
+# check argument - language
+if [ "$1" = "c" ] 
+then
+  language=$1
+  shift
+else
+  echo "[ExtractAndRename] error in language parameter"
+  usage
+  exit 3
+fi
+
+
+# check granularity
+if [ "$1" = "function" ] || [ "$1" = "block" ]
+then
+  if [ "$1" = "function" ]
+  then
+    granularity="functions"
+  else
+    granularity="blocks"
+  fi
+  shift
+else
+  echo "[ExtractAndRename] error in granularity parameter"
+  usage
+  exit 4
+fi
+
+#check rename
+if [ "$1" = "" ]
+then
+  rename=none
+else
+  if [ "$1" = "blind" ] || [ "$1" = "consistent" ]
+  then
+    rename=$1
+    shift
+  else
+    echo "[ExtractAndRename] error in rename parameter"
+    usage
+    exit 5
+  fi
+fi
+
+# check we have a source directory
+if [ -d "$1" ]
+then
+  source_dir=$1
+  shift
+else
+  echo "[ExtractAndRename] error in source dir parameter"
+  usage
+  exit 6
+fi
+
+# check we have a output directory
+if [ -d "$1" ]
+then
+  output_dir=$1
+  shift
+else
+  echo "[ExtractAndRename] error in output dir parameter"
+
+  usage
+  exit 7
+fi
+
+if [ ${debug_mode} = "true" ]
+then
+  echo "language    = ${language}"
+  echo "granularity = ${granularity}"
+  echo "rename      = ${rename}"
+  echo "source-dir  = ${source_dir}"
+  echo "output-dir  = ${output_dir}"
+  echo ""
+fi
+
+echo "Done"
+
+# Extract 시작
+# @ Expected Output
+#   functions.xml included CodeFragments in output_dir with 
+
+datestamp=`date +%F-%T`
+
+echo "[ExtractAndRename] ${lib}/scripts/Extract ${granularity} ${language} "${source_dir}"  "${output_dir}" > "${output_dir}"/${granularity}-${datestamp}.log 2>&1"
+${lib}/scripts/Extract ${granularity} ${language} "${source_dir}"  "${output_dir}" > "${output_dir}"/${granularity}-${datestamp}.log 2>&1
+result=$?
+echo ""
+
+if [ $result -ge 99 ]
+then
+    echo "[ExtractAndRename] *** ERROR: Extraction failed, code $result"
+    echo "[ExtractAndRename] Detailed log in ${output_dir}/${granularity}-${datestamp}.log"
+    echo ""
+    exit 99
+fi
+
+# Rename 시작
+# @ Expected Output
+#   
+pcfile="${output_dir}"/${granularity}
+
+echo "[ExtractAndRename] ${lib}/scripts/Rename ${granularity} ${language} "${pcfile}.xml" ${rename} >> "${output_dir}"/${granularity}-${datestamp}.log 2>&1"
+${lib}/scripts/Rename ${granularity} ${language} "${pcfile}.xml" ${rename} >> "${output_dir}"/${granularity}-${datestamp}.log 2>&1

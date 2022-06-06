@@ -1,0 +1,21 @@
+monitoring_system v1.0.0 Release Note
+=================================
+
+This release monitoring_system in cumulus v0.0.1
+
+Introduction:
+    Darkweb monitoring service for Sejong univ. infosec major Capstone Design
+
+Configuration:
+    socket
+    SimHash
+    Elgamal
+    NiCad
+    Selenium
+    SQLite3
+
+Feature:
+    crypto and decrypt
+    compare simhash
+    create simhash
+    crawling Web
